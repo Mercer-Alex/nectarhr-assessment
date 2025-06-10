@@ -7,7 +7,8 @@
     "build": "vite build",
     "build-watch": "vite build --watch",
     "lint": "eslint nectarhr-client --fix",
-    "type-check": "vue-tsc --build"
+    "type-check": "vue-tsc --build",
+    "test:unit": "vitest"
   },
   "dependencies": {
     "vue": "^3.5.13",

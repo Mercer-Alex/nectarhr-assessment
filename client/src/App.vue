@@ -31,6 +31,7 @@ import { RouterLink, RouterView } from 'vue-router'
   justify-content: space-between;
   align-items: center;
   height: 45px;
+  font-size: larger;
   a {
     color: black;
     text-decoration: none;

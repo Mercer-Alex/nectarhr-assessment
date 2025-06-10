@@ -1,23 +1,23 @@
-import express, {Request, Response} from 'express'
+import express, {Request, Response} from 'express';
 import { PrismaClient } from '@prisma/client';
-import path from 'path'
-import axios from 'axios'
+import path from 'path';
+import axios from 'axios';
 
-const prisma = new PrismaClient();
-const app = express()
+const prisma = new PrismaClient();;
+const app = express();
 
 
-app.use(express.json())
+app.use(express.json());
 
-// --- Middleware: Request Logger ---
+// Middleware: Request Logger
 app.use((req, _res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
   })
 
-// --- Create user ---
+// Create user
 app.post('/api/users', async (req, res, _) => {
-    const {first_name, email, last_name, active, country} = req.body
+    const {first_name, email, last_name, active, country} = req.body;
     try{
         const newUser = await prisma.user.create({
             data: {
@@ -34,48 +34,76 @@ app.post('/api/users', async (req, res, _) => {
     }
 })
 
-// --- Get all users ---
-app.get('/api/users', async (_req, res) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
+// Get all users
+app.get('/api/users', async (req, res) => {
+    const activeFilter = req.query.active;
+    
+    try {
+        const users = await prisma.user.findMany({where: activeFilter !== undefined ? { active: activeFilter === 'true' } : {}});
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
 });
 
+// Delete users
 app.delete('/api/users', async (_req, res) => {
-  try {
-    await prisma.user.deleteMany() // deletes all rows in the User table
-    res.status(200).json({ message: 'All users deleted successfully' })
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to delete users', details: err.message })
-  }
-})
-
-// --- Get users by country code ---
-app.get('/api/users/by-country/:code', async (req, res) => {
-    const code = req.params.code.toUpperCase()
     try {
-        const users = await prisma.user.findMany({ where: { country: code } });
+        await prisma.user.deleteMany()
+        res.status(200).json({ message: 'All users deleted successfully' });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to delete users', details: err.message });
+    }
+});
+
+// Get users by country code
+app.get('/api/users/by-country/:code', async (req, res) => {
+    const activeFilter = req.query.active;
+    const code = req.params.code.toUpperCase();
+    try {
+        const users = await prisma.user.findMany({
+            where: {
+                country: code, 
+                ...(activeFilter !== undefined && { active: activeFilter === 'true' }),
+            },
+        });
         res.json(users);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch users by country' });
     }
 })
 
-// --- Get duplicate names and their count ---
+// Get country codes
+app.get('/api/countries', async (_req, res) => {
+  try {
+    const countries = await prisma.user.findMany({
+      select: {
+        country: true,
+      },
+      distinct: ['country'],
+      orderBy: {
+        country: 'asc',
+      },
+    });
+    res.json(countries.map(c => c.country));
+  } catch (error) {
+    console.error('Failed to fetch countries:', error);
+    res.status(500).json({ error: 'Failed to fetch countries' });
+  }
+});
+
+// Get duplicate names and their count
 app.get('/api/users/duplicate-names', async (req, res) => {
-    const minCount = parseInt(req.query.count as string) || 2
-    const activeFilter = req.query.active
+    const minCount = parseInt(req.query.count as string) || 2;
+    const activeFilter = req.query.active;
 
     try {
         const users = await prisma.user.findMany({
-        where: activeFilter !== undefined ? { active: activeFilter === 'true' } : {},
-        select: {
-            first_name: true,
-            last_name: true,
-        },
+            where: activeFilter !== undefined ? { active: activeFilter === 'true' } : {},
+            select: {
+                first_name: true,
+                last_name: true,
+            },
         });
 
         const nameCount: Record<string, number> = {}
@@ -86,7 +114,7 @@ app.get('/api/users/duplicate-names', async (req, res) => {
 
         const duplicates = Object.entries(nameCount)
         .filter(([_, count]) => count >= minCount)
-        .map(([fullName, count]) => ({ name: fullName, count }))
+        .map(([fullName, count]) => ({ name: fullName, count }));
 
         res.json({ duplicates });
     } catch (err: any) {
@@ -95,8 +123,8 @@ app.get('/api/users/duplicate-names', async (req, res) => {
 });
 
 // Cache the weather data to prevent unnecessary API calls
-const weatherCache: Record<string, { data: any; timestamp: number }> = {}
-const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+const weatherCache: Record<string, { data: any; timestamp: number }> = {};
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 app.get('/api/weather/:stateCode', async (req: Request<{ stateCode: string }>, res: Response): Promise<void> => {
     const stateCode = req.params.stateCode.toUpperCase();
@@ -154,7 +182,7 @@ app.get('/api/weather/:stateCode', async (req: Request<{ stateCode: string }>, r
         LA: { lat: 30.391830, lon: -92.329102 },
     }
 
-    const coords = stateCoordinates[stateCode]
+    const coords = stateCoordinates[stateCode];
     if (!coords){
         res.status(400).json({ error: 'Unsupported state code' });
         return;
